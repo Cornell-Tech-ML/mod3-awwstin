@@ -13,10 +13,8 @@ from . import operators
 from .autodiff import Context
 from .tensor_ops import SimpleBackend, TensorBackend
 
-
 if TYPE_CHECKING:
     from typing import Any, List, Tuple
-
     from .tensor import Tensor
     from .tensor_data import UserIndex, UserShape
 
@@ -61,8 +59,9 @@ class Function:
 
         # Create a new variable from the result with a new history.
         if need_grad:
-            back = minitorch.History(cls, ctx, tensor_vals)
-            # Local import to avoid circular dependencies and NameError
+            from .tensor import History
+
+            back = History(cls, ctx, tuple(tensor_vals))
             from .tensor import Tensor
 
             return Tensor(c._tensor, back, backend=c.backend)

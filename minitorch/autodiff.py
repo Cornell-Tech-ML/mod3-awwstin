@@ -153,3 +153,17 @@ class Context:
     def saved_tensors(self) -> Tuple[Any, ...]:
         """Return the saved tensors."""
         return self.saved_values
+
+
+@dataclass
+class History:
+    """Class to track the history of computations for autograd."""
+
+    last_fn: Any
+    ctx: Context
+    inputs: Tuple[Any, ...]
+
+    def __init__(self, last_fn: Any, ctx: Context, inputs: Tuple[Any, ...]) -> None:
+        self.last_fn = last_fn
+        self.ctx = ctx
+        self.inputs = inputs

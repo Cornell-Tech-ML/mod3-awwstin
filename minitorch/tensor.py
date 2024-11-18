@@ -602,3 +602,31 @@ class Tensor:
     def zero_grad_(self) -> None:
         """Reset the gradients of all parameters to None."""
         self.grad = None
+
+    @staticmethod
+    def tensor(
+        data: Union[Storage, List[float], np.ndarray],
+        backend: Optional[TensorBackend] = None,
+    ) -> Tensor:
+        """Create a new tensor from data.
+
+        Args:
+        ----
+            data: Data to create tensor from
+            backend: Backend to use for tensor operations
+
+        Returns:
+        -------
+            A new Tensor
+
+        """
+        if isinstance(data, np.ndarray):
+            # Convert numpy array to list and get its shape
+            return Tensor.make(data.flatten().tolist(), data.shape, backend=backend)
+        elif isinstance(data, (list, tuple)):
+            # Convert to numpy array to get proper shape, then back to list
+            arr = np.array(data)
+            return Tensor.make(arr.flatten().tolist(), arr.shape, backend=backend)
+        else:
+            # Handle scalar values
+            return Tensor.from_scalar(data, backend=backend)
