@@ -552,8 +552,6 @@ def _tensor_matrix_multiply(
     pi = cuda.threadIdx.x
     pj = cuda.threadIdx.y
 
-    accumulator = 0.0
-
     for start in range(0, a_shape[2], BLOCK_DIM):
         if i < out_shape[1] and start + pj < a_shape[2]:
             a_pos = (
@@ -574,16 +572,15 @@ def _tensor_matrix_multiply(
 
         cuda.syncthreads() 
         
+        temp = 0.0
         for k in range(BLOCK_DIM):
             if k + start < a_shape[2]: 
-                accumulator += a_shared[pi, k] * b_shared[k, pj] 
+                temp += a_shared[pi, k] * b_shared[k, pj] 
 
         cuda.syncthreads() 
 
     if i < out_shape[1] and j < out_shape[2]:
-        out[batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = (
-            accumulator
-        )
+        out[batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = temp
 
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)
