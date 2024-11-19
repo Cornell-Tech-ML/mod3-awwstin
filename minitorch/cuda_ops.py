@@ -571,7 +571,7 @@ def _tensor_matrix_multiply(
 
         # Load the tile of matrix B into shared memory
         if start_idx + pi < b_shape[-2] and j < b_shape[-1]:
-            a_shared[pi, pj] = b_storage[
+            b_shared[pi, pj] = b_storage[
                 batch * b_batch_stride
                 + (start_idx + pi) * b_strides[-2]
                 + j * b_strides[-1]
