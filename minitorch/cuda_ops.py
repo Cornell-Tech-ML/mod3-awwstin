@@ -561,15 +561,15 @@ def _tensor_matrix_multiply(
     for start_idx in range(0, a_shape[2], BLOCK_DIM):
         # Load the tile of matrix A into shared memory
         if i < out_shape[1] and start_idx + pj < a_shape[2]:
-            pos = a_batch_stride * batch + i * a_strides[1] + (start_idx + pj) * a_strides[2]
-            a_shared[pi, pj] = a_storage[pos]
+            pos_a = a_batch_stride * batch + i * a_strides[1] + (start_idx + pj) * a_strides[2]
+            a_shared[pi, pj] = a_storage[pos_a]
         else:
             a_shared[pi, pj] = 0.0
 
         # Load the tile of matrix B into shared memory
         if j < out_shape[2] and start_idx + pi < b_shape[1]:
-            pos = b_batch_stride * batch + (start_idx + pi) * b_strides[1] + j * b_strides[2]
-            b_shared[pi, pj] = b_storage[pos]
+            pos_b = b_batch_stride * batch + (start_idx + pi) * b_strides[1] + j * b_strides[2]
+            b_shared[pi, pj] = b_storage[pos_b]
         else:
             b_shared[pi, pj] = 0.0
 
