@@ -10,7 +10,8 @@ import numpy as np
 from . import operators
 from .autodiff import Context, Variable, backpropagate
 from .tensor_data import TensorData
-from .tensor_ops import TensorOps, TensorBackend
+from .tensor_ops import TensorBackend
+from .fast_ops import FastOps
 
 # Comment these out if not yet implemented
 from .tensor_functions import (
@@ -82,7 +83,8 @@ class Tensor:
         _tensor_count += 1
         self.unique_id = _tensor_count
         assert isinstance(v, TensorData)
-        assert backend is not None
+        if backend is None:
+            backend = TensorBackend(ops=FastOps)
         self._tensor = v
         self.history = back
         self.backend = backend
@@ -172,8 +174,11 @@ class Tensor:
         strides: Optional[UserStrides] = None,
         backend: Optional[TensorBackend] = None,
     ) -> Tensor:
-        """Create a new tensor from data"""
+        """Create a new tensor from data."""
+        if backend is None:
+            backend = TensorBackend(ops=FastOps)
         return Tensor(TensorData(storage, shape, strides), backend=backend)
+
 
     def expand(self, other: Tensor) -> Tensor:
         """Method used to allow for backprop over broadcasting.
@@ -344,7 +349,7 @@ class Tensor:
 
         """
         if backend is None:
-            backend = TensorBackend(ops=TensorOps)
+            backend = TensorBackend(ops=FastOps)
         data = TensorData(np.array([value]), (1,), (1,))
         return cls(data, backend=backend)
 
@@ -620,6 +625,8 @@ class Tensor:
             A new Tensor
 
         """
+        if backend is None:
+            backend = TensorBackend(ops=FastOps)
         if isinstance(data, np.ndarray):
             # Convert numpy array to list and get its shape
             return Tensor.make(data.flatten().tolist(), data.shape, backend=backend)
