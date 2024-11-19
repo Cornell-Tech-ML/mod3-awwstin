@@ -534,15 +534,14 @@ def _tensor_matrix_multiply(
     Returns:
         None : Fills in `out`
     """
-    # TODO: Implement for Task 3.4.
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
     # Batch dimension - fixed
     batch = cuda.blockIdx.z
 
     BLOCK_DIM = 32
-    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
-    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
+    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
 
     # The final position c[i, j]
     i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
@@ -552,33 +551,47 @@ def _tensor_matrix_multiply(
     pi = cuda.threadIdx.x
     pj = cuda.threadIdx.y
 
+    # Code Plan:
+    # 1) Move across shared dimension by block dim.
+    #    a) Copy into shared memory for a matrix.
+    #    b) Copy into shared memory for b matrix
+    #    c) Compute the dot produce for position c[i, j]
+
     temp = 0.0
-    for start in range(0, a_shape[2], BLOCK_DIM):
-        if i < out_shape[1] and start + pj < a_shape[2]:
-            a_pos = (
-                batch * a_batch_stride + i * a_strides[1] + (start + pj) * a_strides[2]
-            )
-            a_shared[pi, pj] = a_storage[a_pos]
+    # Loop over tiles of the shared dimension
+    for start_idx in range(0, a_shape[2], BLOCK_DIM):
+        # Load the tile of matrix A into shared memory
+        if i < out_shape[1] and start_idx + pj < a_shape[2]:
+            a_shared[pi, pj] = a_storage[
+                a_batch_stride * batch
+                + i * a_strides[1]
+                + (start_idx + pj) * a_strides[2]
+            ]
         else:
-            a_shared[pi, pj] = 0.
-        if start + pi < b_shape[1] and j < out_shape[2]:
-            b_pos = (
+            a_shared[pi, pj] = 0.0
+
+        # Load the tile of matrix B into shared memory
+        if j < out_shape[2] and start_idx + pi < b_shape[1]:
+            b_shared[pi, pj] = b_storage[
                 batch * b_batch_stride
-                + (start + pi) * b_strides[1]
+                + (start_idx + pi) * b_strides[1]
                 + j * b_strides[2]
-            )
-            b_shared[pi, pj] = b_storage[b_pos]
+            ]
         else:
-            b_shared[pi, pj] = 0. 
+            b_shared[pi, pj] = 0.0
 
-        cuda.syncthreads() 
-        
+        # Ensure all threads have finished copying to shared memory
+        cuda.syncthreads()
+
+        # Compute partial dot product for the current tile
         for k in range(BLOCK_DIM):
-            if k + start < a_shape[2]: 
-                temp += a_shared[pi, k] * b_shared[k, pj] 
+            if k + start_idx < a_shape[2]:
+                temp += a_shared[pi, k] * b_shared[k, pj]
 
-        cuda.syncthreads() 
+        # Ensure all threads have finished using the shared memory
+        cuda.syncthreads()
 
+    # Write result to global memory
     if i < out_shape[1] and j < out_shape[2]:
         out[batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = temp
 
