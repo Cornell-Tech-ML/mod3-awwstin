@@ -179,3 +179,12 @@ def sum(lst: List[float]) -> float:
 def prod(lst: Sequence[Union[int, float]]) -> float:
     """Calculate the product of all elements in a sequence using reduce"""
     return reduce(lambda x, y: x * y, lst)
+
+def square(a: float) -> float:
+    """Calculates the square of a number"""
+    return a * a
+
+def cube(a: float) -> float:
+    """Calculates the cube of a number"""
+    return a * a * a
+    
