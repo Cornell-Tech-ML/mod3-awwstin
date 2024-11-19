@@ -179,7 +179,6 @@ class Tensor:
             backend = TensorBackend(ops=FastOps)
         return Tensor(TensorData(storage, shape, strides), backend=backend)
 
-
     def expand(self, other: Tensor) -> Tensor:
         """Method used to allow for backprop over broadcasting.
         This method is called when the output of `backward`
