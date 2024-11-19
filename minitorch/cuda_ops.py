@@ -558,23 +558,23 @@ def _tensor_matrix_multiply(
     #    c) Compute the dot produce for position c[i, j]
 
     # Loop over tiles of the shared dimension
-    for start_idx in range(0, a_shape[-1], BLOCK_DIM):
+    for start_idx in range(0, a_shape[2], BLOCK_DIM):
         # Load the tile of matrix A into shared memory
-        if i < a_shape[-2] and start_idx + pj < a_shape[-1]:
+        if i < out_shape[1] and start_idx + pj < a_shape[2]:
             a_shared[pi, pj] = a_storage[
-                batch * a_batch_stride
-                + i * a_strides[-2]
-                + (start_idx + pj) * a_strides[-1]
+                a_batch_stride * batch
+                + i * a_strides[1]
+                + (start_idx + pj) * a_strides[2]
             ]
         else:
             a_shared[pi, pj] = 0.0
 
         # Load the tile of matrix B into shared memory
-        if start_idx + pi < b_shape[-2] and j < b_shape[-1]:
+        if j < out_shape[2] and start_idx + pi < b_shape[1]:
             b_shared[pi, pj] = b_storage[
                 batch * b_batch_stride
-                + (start_idx + pi) * b_strides[-2]
-                + j * b_strides[-1]
+                + (start_idx + pi) * b_strides[1]
+                + j * b_strides[2]
             ]
         else:
             b_shared[pi, pj] = 0.0
@@ -585,14 +585,15 @@ def _tensor_matrix_multiply(
         # Compute partial dot product for the current tile
         temp = 0.0
         for k in range(BLOCK_DIM):
-            temp += a_shared[pi, k] * b_shared[k, pj]
+            if k + start_idx < a_shape[2]:
+                temp += a_shared[pi, k] * b_shared[k, pj]
 
         # Ensure all threads have finished using the shared memory
         cuda.syncthreads()
 
     # Write result to global memory
-    if i < out_shape[-2] and j < out_shape[-1]:
-        out[batch * out_strides[0] + i * out_strides[-2] + j * out_strides[-1]] = temp
+    if i < out_shape[1] and j < out_shape[2]:
+        out[batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = temp
 
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)
