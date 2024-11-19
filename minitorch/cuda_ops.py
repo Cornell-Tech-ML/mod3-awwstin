@@ -425,12 +425,14 @@ def tensor_reduce(
         #     # send reduced to global position
         #     if pos == 0:
         #         out[global_pos] = cache[pos]
-        # Global thread index
-        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+        reduce_size = a_shape[reduce_dim]
+        to_index(out_pos, out_shape, out_index)
+        out_pos = index_to_position(out_index, out_strides)
 
-        # Load elements into shared memory and perform the reduction
-        if i < out_size:
-            to_index(i, out_shape, out_index)
+        # Initialize shared memory
+        if pos < reduce_size:
+            # Copy input to shared memory
+            out_index[reduce_dim] = pos
             a_pos = index_to_position(out_index, a_strides)
             cache[pos] = a_storage[a_pos]
         else:
@@ -438,16 +440,15 @@ def tensor_reduce(
 
         cuda.syncthreads()
 
-        # Perform reduction within the block
-        stride = 1
-        while stride < BLOCK_DIM:
-            index = 2 * stride * pos
-            if index < BLOCK_DIM:
-                cache[index] = fn(cache[index], cache[index + stride])
-            stride *= 2
+        # Parallel reduction in shared memory
+        stride = BLOCK_DIM // 2
+        while stride > 0:
+            if pos < stride and pos + stride < reduce_size:
+                cache[pos] = fn(cache[pos], cache[pos + stride])
             cuda.syncthreads()
+            stride //= 2
 
-        # Write the result of reduction to output
+        # Write back the final result
         if pos == 0:
             out[out_pos] = cache[0]
 
