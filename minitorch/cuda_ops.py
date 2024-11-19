@@ -298,6 +298,80 @@ class CudaOps(TensorOps):
         return ret
 
     @staticmethod
+    def log_map() -> MapProto:
+        """CUDA implementation of natural logarithm."""
+        @cuda.jit()
+        def cuda_log_kernel(
+            out: Storage,
+            out_shape: Shape,
+            out_strides: Strides,
+            out_size: int,
+            in_storage: Storage,
+            in_shape: Shape,
+            in_strides: Strides,
+        ) -> None:
+            i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+            if i < out_size:
+                out_index = cuda.local.array(MAX_DIMS, numba.int32)
+                in_index = cuda.local.array(MAX_DIMS, numba.int32)
+                to_index(i, out_shape, out_index)
+                broadcast_index(out_index, out_shape, in_shape, in_index)
+                out_pos = index_to_position(out_index, out_strides)
+                in_pos = index_to_position(in_index, in_strides)
+                val = in_storage[in_pos]
+                out[out_pos] = math.log(val)
+
+        def ret(a: Tensor, out: Optional[Tensor] = None) -> Tensor:
+            if out is None:
+                out = a.zeros(a.shape)
+
+            threadsperblock = THREADS_PER_BLOCK
+            blockspergrid = (out.size + threadsperblock - 1) // threadsperblock
+            cuda_log_kernel[blockspergrid, threadsperblock](
+                *out.tuple(), out.size, *a.tuple()
+            )
+            return out
+
+        return ret
+
+    @staticmethod
+    def exp_map() -> MapProto:
+        """CUDA implementation of exponentiation."""
+        @cuda.jit()
+        def cuda_exp_kernel(
+            out: Storage,
+            out_shape: Shape,
+            out_strides: Strides,
+            out_size: int,
+            in_storage: Storage,
+            in_shape: Shape,
+            in_strides: Strides
+        ) -> None:
+            i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+            if i < out_size:
+                out_index = cuda.local.array(MAX_DIMS, numba.int32)
+                in_index = cuda.local.array(MAX_DIMS, numba.int32)
+                to_index(i, out_shape, out_index)
+                broadcast_index(out_index, out_shape, in_shape, in_index)
+                out_pos = index_to_position(out_index, out_strides)
+                in_pos = index_to_position(in_index, in_strides)
+                val = in_storage[in_pos]
+                out[out_pos] = math.exp(val)
+
+        def ret(a: Tensor, out: Optional[Tensor] = None) -> Tensor:
+            if out is None:
+                out = a.zeros(a.shape)
+
+            threadsperblock = THREADS_PER_BLOCK
+            blockspergrid = (out.size + threadsperblock - 1) // threadsperblock
+            cuda_exp_kernel[blockspergrid, threadsperblock](
+                *out.tuple(), out.size, *a.tuple()
+            )
+            return out
+
+        return ret
+
+    @staticmethod
     def add_constant_map(constant: float) -> MapProto:
         """CUDA implementation of adding a constant."""
         @cuda.jit()
@@ -523,10 +597,16 @@ class CudaOps(TensorOps):
         """CUDA implementation of sum reduction."""
         @cuda.jit()
         def cuda_add_reduce_kernel(
-            out, out_shape, out_strides, out_size,
-            a_storage, a_shape, a_strides,
-            reduce_dim, start
-        ):
+            out: Storage,
+            out_shape: Shape,
+            out_strides: Strides,
+            out_size: int,
+            a_storage: Storage,
+            a_shape: Shape,
+            a_strides: Strides,
+            reduce_dim: int,
+            start: float
+        ) -> None:
             BLOCK_DIM = 1024
             cache = cuda.shared.array(BLOCK_DIM, numba.float64)
             i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
@@ -686,79 +766,7 @@ def _tensor_matrix_multiply(
         ] = tmp
 
 
-@staticmethod
-def log_map() -> MapProto:
-    """CUDA implementation of natural logarithm."""
-    @cuda.jit()
-    def cuda_log_kernel(
-        out: Storage,
-        out_shape: Shape,
-        out_strides: Strides,
-        out_size: int,
-        in_storage: Storage,
-        in_shape: Shape,
-        in_strides: Strides,
-    ) -> None:
-        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-        if i < out_size:
-            out_index = cuda.local.array(MAX_DIMS, numba.int32)
-            in_index = cuda.local.array(MAX_DIMS, numba.int32)
-            to_index(i, out_shape, out_index)
-            broadcast_index(out_index, out_shape, in_shape, in_index)
-            out_pos = index_to_position(out_index, out_strides)
-            in_pos = index_to_position(in_index, in_strides)
-            val = in_storage[in_pos]
-            out[out_pos] = math.log(val)
 
-    def ret(a: Tensor, out: Optional[Tensor] = None) -> Tensor:
-        if out is None:
-            out = a.zeros(a.shape)
-
-        threadsperblock = THREADS_PER_BLOCK
-        blockspergrid = (out.size + threadsperblock - 1) // threadsperblock
-        cuda_log_kernel[blockspergrid, threadsperblock](
-            *out.tuple(), out.size, *a.tuple()
-        )
-        return out
-
-    return ret
-
-@staticmethod
-def exp_map() -> MapProto:
-    """CUDA implementation of exponentiation."""
-    @cuda.jit()
-    def cuda_exp_kernel(
-        out: Storage,
-        out_shape: Shape,
-        out_strides: Strides,
-        out_size: int,
-        in_storage: Storage,
-        in_shape: Shape,
-        in_strides: Strides
-    ) -> None:
-        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-        if i < out_size:
-            out_index = cuda.local.array(MAX_DIMS, numba.int32)
-            in_index = cuda.local.array(MAX_DIMS, numba.int32)
-            to_index(i, out_shape, out_index)
-            broadcast_index(out_index, out_shape, in_shape, in_index)
-            out_pos = index_to_position(out_index, out_strides)
-            in_pos = index_to_position(in_index, in_strides)
-            val = in_storage[in_pos]
-            out[out_pos] = math.exp(val)
-
-    def ret(a: Tensor, out: Optional[Tensor] = None) -> Tensor:
-        if out is None:
-            out = a.zeros(a.shape)
-
-        threadsperblock = THREADS_PER_BLOCK
-        blockspergrid = (out.size + threadsperblock - 1) // threadsperblock
-        cuda_exp_kernel[blockspergrid, threadsperblock](
-            *out.tuple(), out.size, *a.tuple()
-        )
-        return out
-
-    return ret
 
 
 tensor_matrix_multiply = cuda.jit()(_tensor_matrix_multiply)
