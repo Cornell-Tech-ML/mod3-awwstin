@@ -30,8 +30,8 @@ class Network(minitorch.Module):
 
     def forward(self, x):
         l1 = self.layer1.forward(x).relu()
-        l2 = self.layer2.forward(h1).relu()
-        return self.layer3.forward(h2).sigmoid()
+        l2 = self.layer2.forward(l1).relu()
+        return self.layer3.forward(l2).sigmoid()
 
 
 class Linear(minitorch.Module):
