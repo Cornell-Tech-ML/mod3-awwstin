@@ -580,7 +580,9 @@ def _tensor_matrix_multiply(
         cuda.syncthreads() 
 
     if i < out_shape[1] and j < out_shape[2]:
-        out[batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = temp
+        out[batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = (
+            temp
+)
 
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)
